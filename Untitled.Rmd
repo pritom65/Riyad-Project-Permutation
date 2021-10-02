@@ -1,0 +1,114 @@
+---
+title: "Untitled"
+author: "pritom"
+date: "10/2/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(gtools)
+library(DescTools)
+adult <- read_csv("adult_csv.csv")
+```
+
+```{r}
+skimr::skim(adult)
+```
+
+Selecting important variables.
+```{r}
+adult <- 
+    adult %>% 
+    select(workclass, `marital-status`, age, class)
+```
+
+Counting the workclass group
+```{r}
+adult %>% 
+    count(workclass, sort = T)
+```
+
+
+```{r}
+adult$workclass[adult$workclass == "Without-pay" | adult$workclass == "Never-worked"] <- "Unemployed"
+adult$workclass[adult$workclass == "State-gov" | adult$workclass == "Local-gov"] <- "SL-gov"
+adult$workclass[adult$workclass == "Self-emp-inc" | adult$workclass == "Self-emp-not-inc"] <- "Self-employed"
+table(adult$workclass)
+table(adult$'marital-status')
+adult$'marital-status'[adult$'marital-status' == "Married-AF-spouse" | adult$'marital-status' == "Married-civ-spouse" | adult$'marital-status' == "Married-spouse-absent"] <- "Married"
+
+adult$'marital-status'[adult$'marital-status' == "Divorced" |
+                       adult$'marital-status' == "Separated" |
+                       adult$'marital-status' == "Widowed"] <- "Not-Married"
+
+table(adult$'marital-status')
+adult$workclass <- as.factor(adult$workclass)
+adult$'marital-status' <- as.factor(adult$'marital-status')
+adult$class <- as.factor(adult$class)
+adult[adult == "?"] <- NA
+adult <- na.omit(adult)
+```
+
+
+```{r}
+# required packages "tidyverse", "gtools" and "DescTools"
+par_pseudo <-
+    function(dependent_var = "class",
+             independent_var = names(adult)[-4],
+             data) {
+        as_tibble(permutations(n = 3, r = 3, v = independent_var)) %>%
+            mutate_all(.funs = ~ ifelse(str_detect(.x, "-"), paste0("`", .x, "`"), .x)) %>%
+            mutate(id = row_number(), .before = everything()) %>%
+            pivot_longer(-id) %>%
+            mutate(name = parse_number(name)) %>%
+            group_by(id) %>%
+            summarise(formula = paste(value, collapse = " + ")) %>%
+            mutate(
+                model = map(formula, .f = ~ glm(
+                    paste(dependent_var, " ~ ", .x), family = binomial(), data
+                )),
+                pseudoR2 = map(model, PseudoR2),
+                pseudoR2 = unlist(pseudoR2)
+            )
+    }
+
+par_pseudo(data = adult)
+```
+
+
+```{r}
+x <- glm(class ~ `marital-status`, family = binomial(), adult)
+summary(x)
+adult<-data.frame(adult)
+PseudoR2(x)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
